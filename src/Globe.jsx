@@ -1,7 +1,7 @@
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Sphere, Html } from "@react-three/drei";
+import { OrbitControls, Sphere, Html, Stars } from "@react-three/drei";
 import * as THREE from "three";
 import gsap from "gsap";
 
@@ -43,6 +43,46 @@ function CameraAnimator({ targetPos }) {
     return null;
 }
 
+// Atmosphere shader material
+function AtmosphereShader() {
+    const atmosphereVertexShader = `
+        varying vec3 vNormal;
+        void main() {
+            vNormal = normalize(normalMatrix * normal);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    `;
+
+    const atmosphereFragmentShader = `
+        varying vec3 vNormal;
+        void main() {
+            float intensity = pow(0.7 - dot(vNormal, vec3(0, 0, 1.0)), 2.0);
+            gl_FragColor = vec4(0.3, 0.6, 1.0, 1.0) * intensity;
+        }
+    `;
+
+    return { atmosphereVertexShader, atmosphereFragmentShader };
+}
+
+function Atmosphere() {
+    const { atmosphereVertexShader, atmosphereFragmentShader } = AtmosphereShader();
+
+    const atmosphereMaterial = useMemo(() => {
+        return new THREE.ShaderMaterial({
+            vertexShader: atmosphereVertexShader,
+            fragmentShader: atmosphereFragmentShader,
+            blending: THREE.AdditiveBlending,
+            side: THREE.BackSide
+        });
+    }, [atmosphereVertexShader, atmosphereFragmentShader]);
+
+    return (
+        <Sphere args={[2.4, 64, 64]}>
+            <primitive object={atmosphereMaterial} attach="material" />
+        </Sphere>
+    );
+}
+
 function GlobeMesh({ onShowInfo }) {
     const globeRef = useRef();
     const meshRefs = useRef([]);
@@ -75,10 +115,17 @@ function GlobeMesh({ onShowInfo }) {
 
     return (
         <>
+
             {/* Globe */}
             <Sphere ref={globeRef} args={[2, 64, 64]}>
-                <meshStandardMaterial map={new THREE.TextureLoader().load(earthTexture)} />
+                <meshStandardMaterial
+                    map={new THREE.TextureLoader().load(earthTexture)}
+                    roughness={0.8}
+                    metalness={0.1}
+                />
             </Sphere>
+
+            <Atmosphere />
 
             {/* Pins */}
             {locations.map((loc, i) => {
@@ -104,11 +151,42 @@ function GlobeMesh({ onShowInfo }) {
 
 export default function Globe({ onShowInfo }) {
     return (
-        <Canvas camera={{ position: [0, 0, 6], fov: 50 }}>
-            <ambientLight intensity={0.9} />
-            <pointLight position={[5, 3, 5]} />
+        <Canvas
+            camera={{ position: [0, 0, 6], fov: 50 }}
+            style={{ background: '#000000' }}
+        >
+            {/* Space background with stars */}
+            <Stars
+                radius={100}
+                depth={10}
+                count={10000}
+                factor={5}
+                saturation={0}
+                fade={true}
+                speed={0.5}
+            />
+
+            {/* Enhanced lighting for better atmosphere */}
+            <ambientLight intensity={0.4} color="#ffffff" />
+            <directionalLight
+                position={[5, 3, 5]}
+                intensity={1.2}
+                color="#ffffff"
+                castShadow
+            />
+            <pointLight
+                position={[-5, -3, -5]}
+                intensity={0.5}
+                color="#4466bb"
+            />
+
             <GlobeMesh onShowInfo={onShowInfo} />
-            <OrbitControls enableDamping />
+            <OrbitControls
+                enableDamping
+                dampingFactor={0.05}
+                minDistance={3}
+                maxDistance={15}
+            />
         </Canvas>
     );
 }
