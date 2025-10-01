@@ -12,7 +12,7 @@ export default function App() {
         <div className="info-panel">
           <h2>{info.title}</h2>
           <p>{info.description}</p>
-          <button onClick={() => setInfo(null)}>Close</button>
+          <button onClick={() => setInfo(null)}>X</button>
         </div>
       )}
     </div>
