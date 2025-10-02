@@ -83,18 +83,48 @@ function Atmosphere() {
 
 function SplitEffects({ splitProgress, isSplit, isReassembling }) {
     const particlesRef = useRef();
-    const particleCount = 5000;
+    const particleCount = 8000;
+
+    // Store initial properties for each particle
+    const particleData = useMemo(() => {
+        const data = [];
+        for (let i = 0; i < particleCount; i++) {
+            // Generate random direction vectors for eruption effect
+            const phi = Math.random() * Math.PI * 2; // Azimuth angle
+            const theta = Math.random() * Math.PI; // Polar angle
+
+            // Create eruption-like velocity vectors (more upward bias)
+            const upwardBias = 0.3 + Math.random() * 0.7; // Bias towards upward direction
+            const velocity = {
+                x: Math.sin(theta) * Math.cos(phi) * (0.5 + Math.random() * 1.5),
+                y: Math.abs(Math.cos(theta)) * upwardBias * (1 + Math.random() * 2), // Always positive Y (upward)
+                z: Math.sin(theta) * Math.sin(phi) * (0.5 + Math.random() * 1.5)
+            };
+
+            data.push({
+                initialX: (Math.random() - 0.5) * 0.1, // Start near center
+                initialY: (Math.random() - 0.5) * 0.05, // Start near split plane
+                initialZ: (Math.random() - 0.5) * 0.1,
+                velocityX: velocity.x,
+                velocityY: velocity.y,
+                velocityZ: velocity.z,
+                gravity: -0.8 - Math.random() * 0.4, // Random gravity effect
+                life: Math.random() * 0.5 + 0.5, // Particle lifespan multiplier
+                swirl: Math.random() * 0.02 + 0.01 // Individual swirl amount
+            });
+        }
+        return data;
+    }, []);
 
     const particlePositions = useMemo(() => {
         const positions = new Float32Array(particleCount * 3);
         for (let i = 0; i < particleCount; i++) {
-            // Start particles near the center/split plane
-            positions[i * 3] = (Math.random() - 0.5) * 0.7; // x
-            positions[i * 3 + 1] = (Math.random() - 0.5) * 0.3; // y (near split plane)
-            positions[i * 3 + 2] = (Math.random() - 0.5) * 0.7; // z
+            positions[i * 3] = particleData[i].initialX;
+            positions[i * 3 + 1] = particleData[i].initialY;
+            positions[i * 3 + 2] = particleData[i].initialZ;
         }
         return positions;
-    }, []);
+    }, [particleData]);
 
     useFrame(({ clock }) => {
         if (particlesRef.current && isSplit) {
@@ -103,23 +133,42 @@ function SplitEffects({ splitProgress, isSplit, isReassembling }) {
 
             for (let i = 0; i < particleCount; i++) {
                 const i3 = i * 3;
+                const particle = particleData[i];
 
                 if (isReassembling) {
-                    // During reassembly, particles move inward toward the center
-                    const centerPull = 0.01;
-                    positions[i3] *= (1 - centerPull); // Pull x toward center
-                    positions[i3 + 1] *= (1 - centerPull); // Pull y toward center
-                    positions[i3 + 2] *= (1 - centerPull); // Pull z toward center
+                    // During reassembly, particles spiral inward toward the center
+                    const centerPull = 0.015;
+                    const currentX = positions[i3];
+                    const currentY = positions[i3 + 1];
+                    const currentZ = positions[i3 + 2];
 
-                    // Add some swirl effect during reassembly
-                    const swirl = Math.sin(time * 3 + i) * 0.003;
-                    positions[i3] += Math.sin(time * 3 + i) * 0.003;
-                    positions[i3 + 2] += Math.cos(time * 3 + i) * 0.1;
+                    // Pull toward center with spiral motion
+                    positions[i3] = currentX * (1 - centerPull) + Math.sin(time * 4 + i * 0.1) * particle.swirl;
+                    positions[i3 + 1] = currentY * (1 - centerPull * 0.8); // Slower Y convergence
+                    positions[i3 + 2] = currentZ * (1 - centerPull) + Math.cos(time * 4 + i * 0.1) * particle.swirl;
                 } else {
-                    // Normal split behavior - particles moving outward from the lava core
-                    positions[i3] += (Math.random() - 0.5) * 0.01 * splitProgress; // x movement
-                    positions[i3 + 1] += Math.sin(time + i) * 0.01 + (Math.random() - 0.5) * 0.001; // y movement with float
-                    positions[i3 + 2] += (Math.random() - 0.5) * 0.1 * splitProgress; // z movement
+                    // Eruption effect - particles explode outward with physics
+                    const t = splitProgress * particle.life; // Individual particle timeline
+
+                    // Physics-based motion with gravity
+                    const x = particle.initialX + particle.velocityX * t;
+                    const y = particle.initialY + particle.velocityY * t + 0.5 * particle.gravity * t * t;
+                    const z = particle.initialZ + particle.velocityZ * t;
+
+                    // Add some turbulence and swirl for more realistic effect
+                    const turbulence = Math.sin(time * 2 + i * 0.5) * 0.05 * t;
+                    const swirl = Math.sin(time * 3 + i * 0.3) * particle.swirl * t;
+
+                    positions[i3] = x + turbulence + swirl;
+                    positions[i3 + 1] = y + Math.sin(time * 1.5 + i) * 0.02 * t; // Slight floating motion
+                    positions[i3 + 2] = z + turbulence - swirl;
+
+                    // Reset particles that have moved too far or fallen too low
+                    if (Math.abs(positions[i3]) > 8 || Math.abs(positions[i3 + 2]) > 8 || positions[i3 + 1] < -5) {
+                        positions[i3] = particle.initialX;
+                        positions[i3 + 1] = particle.initialY;
+                        positions[i3 + 2] = particle.initialZ;
+                    }
                 }
             }
 
@@ -129,24 +178,35 @@ function SplitEffects({ splitProgress, isSplit, isReassembling }) {
 
     if (!isSplit) return null;
 
+    // Dynamic particle size based on split progress
+    const particleSize = 0.001 + splitProgress * 0.018;
+    const particleOpacity = isReassembling ?
+        Math.max(0.2, 1 - splitProgress) : // Fade out during reassembly
+        Math.min(0.9, splitProgress * 1.2); // Fade in during split
+
     return (
-        <points ref={particlesRef}>
-            <bufferGeometry>
-                <bufferAttribute
-                    attach="attributes-position"
-                    array={particlePositions}
-                    count={particleCount}
-                    itemSize={3}
+        <>
+            <points ref={particlesRef}>
+                <bufferGeometry>
+                    <bufferAttribute
+                        attach="attributes-position"
+                        array={particlePositions}
+                        count={particleCount}
+                        itemSize={3}
+                    />
+                </bufferGeometry>
+                <pointsMaterial
+                    size={particleSize}
+                    color={isReassembling ?
+                        "#4488ff" :
+                        "#ff4500"}
+                    opacity={particleOpacity}
+                    transparent
+                    blending={THREE.AdditiveBlending}
+                    sizeAttenuation={true} // Makes particles smaller when far away
                 />
-            </bufferGeometry>
-            <pointsMaterial
-                size={0.08}
-                color={isReassembling ? "#4488ff" : "#ff4500"}
-                opacity={splitProgress * 0.8}
-                transparent
-                blending={THREE.AdditiveBlending}
-            />
-        </points>
+            </points>
+        </>
     );
 }
 
