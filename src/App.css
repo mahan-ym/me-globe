@@ -40,3 +40,20 @@
 .read-the-docs {
   color: #888;
 }
+
+@keyframes pulse {
+  0% {
+    opacity: 0.7;
+    transform: scale(0.95);
+  }
+
+  50% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0.7;
+    transform: scale(0.95);
+  }
+}
