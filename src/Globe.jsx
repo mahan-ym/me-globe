@@ -502,7 +502,7 @@ function RotationSpeedTracker({ onSpeedChange, controlsRef }) {
     return null;
 }
 
-export default function Globe({ onShowInfo }) {
+export default function Globe({ onShowInfo, onShowMydata }) {
     const controlsRef = useRef();
     const [isSplit, setIsSplit] = useState(false);
     const [splitProgress, setSplitProgress] = useState(0);
@@ -550,6 +550,7 @@ export default function Globe({ onShowInfo }) {
     const handleSpeedChange = (speed) => {
         if (speed > SPEED_THRESHOLD && !isSplit) {
             triggerSplit();
+            onShowMydata(true);
         }
     };
 
