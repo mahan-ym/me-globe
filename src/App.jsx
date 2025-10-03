@@ -18,7 +18,7 @@ export default function App() {
       )}
       {mydata && (
         <div className="info-panel">
-          <img width="100px" src="Pin.png" alt="Mahan" />
+          <img src="me.jpg" alt="Mahan" />
           <h2>Mahan</h2>
           <p>About me: I get into programming because of my love of the games.
             Unfortunately, I don't have much time to play games anymore 😔 <br />
